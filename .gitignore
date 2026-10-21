@@ -1,0 +1,26 @@
+# Build outputs
+[Bb]in/
+[Oo]bj/
+[Pp]ublish*/
+[Aa]rtifacts/
+[Tt]est[Rr]esults/
+*.nupkg
+*.snupkg
+
+# IDE and user-specific files
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Local runtime output
+*.mp4
+*.log
+tools/ffmpeg/win-x64/
+
+# OS metadata
+.DS_Store
+Thumbs.db
