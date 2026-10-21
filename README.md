@@ -1,5 +1,8 @@
 # Desktop Binarizer
 
+[![CI](https://github.com/sumengqi/DesktopBinarizer/actions/workflows/ci.yml/badge.svg)](https://github.com/sumengqi/DesktopBinarizer/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 一个用于 Windows 的实时桌面色彩量化工具。它可以抓取整个虚拟桌面或指定窗口，
 将画面缩放到目标分辨率，再进行灰度、低位深 RGB 或自定义调色板量化。
 
@@ -96,3 +99,8 @@ tools/ffmpeg/                          FFmpeg 依赖说明与本地生成目录
 录制使用 NAudio 进行 WASAPI 系统音频回环采集，并使用 FFmpeg 进行 H.264/AAC
 编码。FFmpeg 的许可证与构建说明位于发布目录的 `ffmpeg` 子目录。
 第三方组件说明见 `THIRD_PARTY_NOTICES.md`。
+
+## 开源协议
+
+本项目源码使用 [MIT License](LICENSE)。FFmpeg 和 NAudio 仍分别适用各自的许可条款，
+详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

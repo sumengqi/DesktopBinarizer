@@ -1,5 +1,9 @@
 # Third-Party Notices
 
+Desktop Binarizer is licensed under the MIT License. The licenses below apply
+to the listed third-party components and are not replaced by the project
+license.
+
 ## FFmpeg
 
 The `ffmpeg/ffmpeg.exe` distributed with this application is FFmpeg

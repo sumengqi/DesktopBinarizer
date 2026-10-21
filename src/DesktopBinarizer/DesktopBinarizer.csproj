@@ -9,6 +9,11 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>DesktopBinarizer</AssemblyName>
     <RootNamespace>DesktopBinarizer</RootNamespace>
+    <Authors>sumengqi</Authors>
+    <Copyright>Copyright © 2026 sumengqi</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/sumengqi/DesktopBinarizer</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="NAudio.Wasapi" Version="2.3.0" />
@@ -25,6 +30,10 @@
     </Content>
     <Content Include="..\..\THIRD_PARTY_NOTICES.md">
       <Link>THIRD_PARTY_NOTICES.md</Link>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="..\..\LICENSE">
+      <Link>LICENSE</Link>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
   </ItemGroup>
