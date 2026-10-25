@@ -31,14 +31,17 @@ Run("1 bit 灰度就是二值化", TestThresholdOutput);
 Run("1–8 bit 灰度只产生对应灰阶", TestGrayscaleBitDepths);
 Run("1–8 bit RGB 等位深只产生对应通道级别", TestUniformRgbBitDepths);
 Run("RGB 分通道位深分别生效", TestPerChannelRgbBitDepths);
+Run("无抖动 RGB 快速路径保持精确量化", TestDirectRgbQuantizationExact);
 Run("自定义调色板只输出调色板颜色", TestCustomPalette);
 Run("屏幕取色采样返回准确像素", TestScreenColorSampling);
 Run("像素间距按指定颜色和宽度插入", TestPixelSpacing);
 Run("像素间距在画面缩放后插入", TestPixelSpacingAfterScaling);
 Run("预览间距按照逻辑输出像素边界绘制", TestPreviewPixelGridScaling);
+Run("像素网格支持分数预览倍率", TestFractionalPixelGridScaling);
 Run("像素间距预览严格点对点且没有外框", TestPixelPreviewRendering);
 Run("预览快速换帧不会出现背景空白", TestRapidPreviewFrameSwaps);
 Run("单帧合成异常会被抑制", TestTransientFrameSuppression);
+Run("瞬态帧过滤器释放后拒绝调用", TestTransientFrameFilterDisposal);
 Run("配置可以完整导出和导入", TestConfigurationRoundTrip);
 Run("所有误差扩散算法支持彩色调色板", TestAllDitherAlgorithms);
 Run("反相会交换黑白", TestInvert);
@@ -336,6 +339,71 @@ static void TestPerChannelRgbBitDepths()
     });
 }
 
+static void TestDirectRgbQuantizationExact()
+{
+    using var source = new Bitmap(256, 1);
+    for (int value = 0; value < 256; value++)
+    {
+        source.SetPixel(
+            value,
+            0,
+            Color.FromArgb(value, 255 - value, (value * 73) & 0xFF));
+    }
+
+    for (int bits = 1; bits <= 8; bits++)
+    {
+        using Bitmap output = ImageProcessor.Process(
+            source,
+            new ImageProcessingOptions(
+                OutputWidth: source.Width,
+                OutputHeight: source.Height,
+                ColorMode: ColorQuantizationMode.RgbUniform,
+                RgbBits: bits,
+                DitherAlgorithm: DitherAlgorithm.None,
+                InputScaleMode: InputScaleMode.Stretch));
+
+        for (int value = 0; value < 256; value++)
+        {
+            Color actual = output.GetPixel(value, 0);
+            Assert(
+                actual.R == QuantizeChannelExpected(value, bits),
+                $"{bits} bit R 通道快速路径在 {value} 处不精确");
+            Assert(
+                actual.G == QuantizeChannelExpected(255 - value, bits),
+                $"{bits} bit G 通道快速路径在 {value} 处不精确");
+            Assert(
+                actual.B == QuantizeChannelExpected((value * 73) & 0xFF, bits),
+                $"{bits} bit B 通道快速路径在 {value} 处不精确");
+        }
+    }
+
+    using Bitmap inverted = ImageProcessor.Process(
+        source,
+        new ImageProcessingOptions(
+            OutputWidth: source.Width,
+            OutputHeight: source.Height,
+            ColorMode: ColorQuantizationMode.RgbPerChannel,
+            RedBits: 2,
+            GreenBits: 3,
+            BlueBits: 5,
+            DitherAlgorithm: DitherAlgorithm.None,
+            Invert: true,
+            InputScaleMode: InputScaleMode.Stretch));
+    for (int value = 0; value < 256; value++)
+    {
+        Color actual = inverted.GetPixel(value, 0);
+        Assert(
+            actual.R == QuantizeChannelExpected(255 - value, 2),
+            $"反相 R 通道快速路径在 {value} 处不精确");
+        Assert(
+            actual.G == QuantizeChannelExpected(value, 3),
+            $"反相 G 通道快速路径在 {value} 处不精确");
+        Assert(
+            actual.B == QuantizeChannelExpected(255 - ((value * 73) & 0xFF), 5),
+            $"反相 B 通道快速路径在 {value} 处不精确");
+    }
+}
+
 static void TestCustomPalette()
 {
     Color[] palette = [Color.Black, Color.Red, Color.Lime, Color.Blue, Color.White];
@@ -470,6 +538,28 @@ static void TestPreviewPixelGridScaling()
         Assert(
             preview.GetPixel(2, index).ToArgb() == Color.Magenta.ToArgb(),
             "纵向间距不在逻辑像素边界");
+    }
+}
+
+static void TestFractionalPixelGridScaling()
+{
+    using var source = new Bitmap(2, 1);
+    source.SetPixel(0, 0, Color.Red);
+    source.SetPixel(1, 0, Color.Lime);
+
+    using Bitmap preview = PixelGridRenderer.Render(
+        source,
+        1.5,
+        1,
+        Color.Magenta);
+
+    Assert(preview.Size == new Size(4, 2), $"1.5× 网格尺寸为 {preview.Size}");
+    for (int y = 0; y < preview.Height; y++)
+    {
+        Assert(preview.GetPixel(0, y).ToArgb() == Color.Red.ToArgb(), "分数倍率红色像素错误");
+        Assert(preview.GetPixel(1, y).ToArgb() == Color.Red.ToArgb(), "分数倍率红色宽度错误");
+        Assert(preview.GetPixel(2, y).ToArgb() == Color.Magenta.ToArgb(), "分数倍率间距错误");
+        Assert(preview.GetPixel(3, y).ToArgb() == Color.Lime.ToArgb(), "分数倍率绿色像素错误");
     }
 }
 
@@ -654,6 +744,19 @@ static void TestTransientFrameSuppression()
     Assert(
         acceptedPage.GetPixel(0, 0).ToArgb() == newPageSecond.GetPixel(0, 0).ToArgb(),
         "持续的新页面没有在第二帧通过");
+}
+
+static void TestTransientFrameFilterDisposal()
+{
+    var filter = new DesktopBinarizer.Capture.TransientFrameFilter();
+    filter.Dispose();
+    filter.Dispose();
+
+    using Bitmap frame = CreateSolidBitmap(8, 8, Color.Black);
+    AssertThrows<ObjectDisposedException>(() =>
+    {
+        using Bitmap _ = filter.Stabilize(1, frame);
+    });
 }
 
 static void TestConfigurationRoundTrip()
@@ -947,6 +1050,13 @@ static HashSet<byte> GetAllowedChannelValues(int bits)
         .Range(0, maximumLevel + 1)
         .Select(level => (byte)Math.Round(level * 255.0 / maximumLevel))
         .ToHashSet();
+}
+
+static byte QuantizeChannelExpected(int value, int bits)
+{
+    int maximumLevel = (1 << bits) - 1;
+    int quantizedLevel = (int)Math.Round(value * maximumLevel / 255.0);
+    return (byte)Math.Round(quantizedLevel * 255.0 / maximumLevel);
 }
 
 static void AssertBinary(Bitmap bitmap)

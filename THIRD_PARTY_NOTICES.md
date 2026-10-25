@@ -19,7 +19,7 @@ in this source repository.
 
 ## NAudio
 
-System loopback audio capture uses NAudio.Wasapi 2.3.0.
+System loopback audio capture uses NAudio.Wasapi 2.4.0.
 
 - Project: https://github.com/naudio/NAudio
 - License: MIT

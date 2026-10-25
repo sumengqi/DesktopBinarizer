@@ -10,59 +10,79 @@ public sealed class TransientFrameFilter : IDisposable
     private const double SimilarChangeRatio = 0.12;
     private const double SimilarMeanDifference = 14;
 
+    private readonly object _sync = new();
     private readonly Dictionary<nint, FrameState> _states = [];
+    private bool _disposed;
 
     public Bitmap Stabilize(nint key, Bitmap current)
     {
         ArgumentNullException.ThrowIfNull(current);
 
-        if (!_states.TryGetValue(key, out FrameState? state) ||
-            state.Stable.Size != current.Size)
+        lock (_sync)
         {
-            state?.Dispose();
-            _states[key] = new FrameState(new Bitmap(current));
-            return new Bitmap(current);
-        }
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (!_states.TryGetValue(key, out FrameState? state) ||
+                state.Stable.Size != current.Size)
+            {
+                state?.Dispose();
+                _states[key] = new FrameState(new Bitmap(current));
+                return new Bitmap(current);
+            }
 
-        DifferenceMetrics stableDifference = Compare(state.Stable, current);
-        if (!IsLargeChange(stableDifference))
-        {
-            state.ReplaceStable(current);
-            state.ClearPending();
-            return new Bitmap(current);
-        }
-
-        if (state.Pending is not null)
-        {
-            DifferenceMetrics pendingDifference = Compare(state.Pending, current);
-            if (IsSimilar(pendingDifference))
+            DifferenceMetrics stableDifference = Compare(state.Stable, current);
+            if (!IsLargeChange(stableDifference))
             {
                 state.ReplaceStable(current);
                 state.ClearPending();
                 return new Bitmap(current);
             }
-        }
 
-        state.ReplacePending(current);
-        return new Bitmap(state.Stable);
+            if (state.Pending is not null)
+            {
+                DifferenceMetrics pendingDifference = Compare(state.Pending, current);
+                if (IsSimilar(pendingDifference))
+                {
+                    state.ReplaceStable(current);
+                    state.ClearPending();
+                    return new Bitmap(current);
+                }
+            }
+
+            state.ReplacePending(current);
+            return new Bitmap(state.Stable);
+        }
     }
 
     public void Remove(nint key)
     {
-        if (_states.Remove(key, out FrameState? state))
+        lock (_sync)
         {
-            state.Dispose();
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (_states.Remove(key, out FrameState? state))
+            {
+                state.Dispose();
+            }
         }
     }
 
     public void Dispose()
     {
-        foreach (FrameState state in _states.Values)
+        lock (_sync)
         {
-            state.Dispose();
+            if (_disposed)
+            {
+                return;
+            }
+
+            foreach (FrameState state in _states.Values)
+            {
+                state.Dispose();
+            }
+
+            _states.Clear();
+            _disposed = true;
         }
 
-        _states.Clear();
         GC.SuppressFinalize(this);
     }
 
@@ -94,33 +114,36 @@ public sealed class TransientFrameFilter : IDisposable
                 ImageLockMode.ReadOnly,
                 PixelFormat.Format32bppArgb);
 
-            int firstByteCount = Math.Abs(firstData.Stride) * first.Height;
-            int secondByteCount = Math.Abs(secondData.Stride) * second.Height;
-            byte[] firstPixels = new byte[firstByteCount];
-            byte[] secondPixels = new byte[secondByteCount];
-            Marshal.Copy(firstData.Scan0, firstPixels, 0, firstByteCount);
-            Marshal.Copy(secondData.Scan0, secondPixels, 0, secondByteCount);
-
             int stepX = Math.Max(1, first.Width / 80);
             int stepY = Math.Max(1, first.Height / 60);
+            int rowByteCount = first.Width * 4;
+            byte[] firstRowPixels = new byte[rowByteCount];
+            byte[] secondRowPixels = new byte[rowByteCount];
             long differenceTotal = 0;
             int changedCount = 0;
             int sampleCount = 0;
             for (int y = 0; y < first.Height; y += stepY)
             {
-                int firstRow = y * firstData.Stride;
-                int secondRow = y * secondData.Stride;
+                Marshal.Copy(
+                    firstData.Scan0 + (y * firstData.Stride),
+                    firstRowPixels,
+                    0,
+                    rowByteCount);
+                Marshal.Copy(
+                    secondData.Scan0 + (y * secondData.Stride),
+                    secondRowPixels,
+                    0,
+                    rowByteCount);
                 for (int x = 0; x < first.Width; x += stepX)
                 {
-                    int firstOffset = firstRow + (x * 4);
-                    int secondOffset = secondRow + (x * 4);
+                    int offset = x * 4;
                     int difference =
-                        (Math.Abs(firstPixels[firstOffset] -
-                            secondPixels[secondOffset]) +
-                        Math.Abs(firstPixels[firstOffset + 1] -
-                            secondPixels[secondOffset + 1]) +
-                        Math.Abs(firstPixels[firstOffset + 2] -
-                            secondPixels[secondOffset + 2])) / 3;
+                        (Math.Abs(firstRowPixels[offset] -
+                            secondRowPixels[offset]) +
+                        Math.Abs(firstRowPixels[offset + 1] -
+                            secondRowPixels[offset + 1]) +
+                        Math.Abs(firstRowPixels[offset + 2] -
+                            secondRowPixels[offset + 2])) / 3;
                     differenceTotal += difference;
                     changedCount += difference >= 60 ? 1 : 0;
                     sampleCount++;

@@ -6,6 +6,9 @@ namespace DesktopBinarizer.Imaging;
 
 public static class ImageProcessor
 {
+    private static readonly byte[][] ChannelQuantizationTables =
+        CreateChannelQuantizationTables();
+
     private static readonly DiffusionKernel FloydSteinberg = new(
         16,
         [
@@ -418,6 +421,121 @@ public static class ImageProcessor
         int height,
         ImageProcessingOptions options)
     {
+        switch (options.ColorMode)
+        {
+            case ColorQuantizationMode.Grayscale:
+                ApplyDirectGrayscale(pixels, stride, width, height, options);
+                return;
+            case ColorQuantizationMode.RgbUniform:
+                byte[] uniformTable = ChannelQuantizationTables[options.RgbBits];
+                ApplyDirectRgb(
+                    pixels,
+                    stride,
+                    width,
+                    height,
+                    uniformTable,
+                    uniformTable,
+                    uniformTable,
+                    options.Invert);
+                return;
+            case ColorQuantizationMode.RgbPerChannel:
+                ApplyDirectRgb(
+                    pixels,
+                    stride,
+                    width,
+                    height,
+                    ChannelQuantizationTables[options.RedBits],
+                    ChannelQuantizationTables[options.GreenBits],
+                    ChannelQuantizationTables[options.BlueBits],
+                    options.Invert);
+                return;
+            case ColorQuantizationMode.CustomPalette:
+                ApplyDirectPalette(pixels, stride, width, height, options);
+                return;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(options.ColorMode));
+        }
+    }
+
+    private static void ApplyDirectGrayscale(
+        byte[] pixels,
+        int stride,
+        int width,
+        int height,
+        ImageProcessingOptions options)
+    {
+        for (int y = 0; y < height; y++)
+        {
+            int row = y * stride;
+            for (int x = 0; x < width; x++)
+            {
+                int offset = row + (x * 4);
+                double red = pixels[offset + 2];
+                double green = pixels[offset + 1];
+                double blue = pixels[offset];
+                if (options.Invert)
+                {
+                    red = 255 - red;
+                    green = 255 - green;
+                    blue = 255 - blue;
+                }
+
+                double luminance =
+                    (0.2126 * red) +
+                    (0.7152 * green) +
+                    (0.0722 * blue);
+                byte value = options.GrayscaleBits == 1
+                    ? luminance >= options.Threshold ? (byte)255 : (byte)0
+                    : QuantizeChannelToByte(luminance, options.GrayscaleBits);
+                pixels[offset] = value;
+                pixels[offset + 1] = value;
+                pixels[offset + 2] = value;
+                pixels[offset + 3] = 255;
+            }
+        }
+    }
+
+    private static void ApplyDirectRgb(
+        byte[] pixels,
+        int stride,
+        int width,
+        int height,
+        byte[] redTable,
+        byte[] greenTable,
+        byte[] blueTable,
+        bool invert)
+    {
+        for (int y = 0; y < height; y++)
+        {
+            int row = y * stride;
+            for (int x = 0; x < width; x++)
+            {
+                int offset = row + (x * 4);
+                int blue = pixels[offset];
+                int green = pixels[offset + 1];
+                int red = pixels[offset + 2];
+                if (invert)
+                {
+                    blue = 255 - blue;
+                    green = 255 - green;
+                    red = 255 - red;
+                }
+
+                pixels[offset] = blueTable[blue];
+                pixels[offset + 1] = greenTable[green];
+                pixels[offset + 2] = redTable[red];
+                pixels[offset + 3] = 255;
+            }
+        }
+    }
+
+    private static void ApplyDirectPalette(
+        byte[] pixels,
+        int stride,
+        int width,
+        int height,
+        ImageProcessingOptions options)
+    {
         for (int y = 0; y < height; y++)
         {
             int row = y * stride;
@@ -425,7 +543,9 @@ public static class ImageProcessor
             {
                 int offset = row + (x * 4);
                 RgbValue source = ReadPixel(pixels, offset, options.Invert);
-                RgbValue quantized = Quantize(source, options);
+                RgbValue quantized = FindNearestPaletteColor(
+                    source,
+                    options.Palette!);
                 SetPixel(pixels, offset, quantized);
             }
         }
@@ -563,6 +683,31 @@ public static class ImageProcessor
         int quantizedLevel = (int)Math.Round(
             ClampByteRange(value) * maximumLevel / 255.0);
         return quantizedLevel * 255.0 / maximumLevel;
+    }
+
+    private static byte QuantizeChannelToByte(double value, int bits)
+    {
+        return (byte)Math.Clamp(
+            (int)Math.Round(QuantizeChannel(value, bits)),
+            0,
+            255);
+    }
+
+    private static byte[][] CreateChannelQuantizationTables()
+    {
+        var tables = new byte[9][];
+        for (int bits = 1; bits <= 8; bits++)
+        {
+            var table = new byte[256];
+            for (int value = 0; value < table.Length; value++)
+            {
+                table[value] = QuantizeChannelToByte(value, bits);
+            }
+
+            tables[bits] = table;
+        }
+
+        return tables;
     }
 
     private static RgbValue FindNearestPaletteColor(

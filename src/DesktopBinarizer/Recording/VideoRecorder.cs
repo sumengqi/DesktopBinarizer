@@ -74,9 +74,8 @@ public sealed class VideoRecorder : IAsyncDisposable
         {
             _audioCapture = new WasapiLoopbackCapture();
             audioFormat = _audioCapture.WaveFormat;
-            _audioBuffer = new BufferedWaveProvider(audioFormat)
+            _audioBuffer = new BufferedWaveProvider(audioFormat, TimeSpan.FromSeconds(2))
             {
-                BufferDuration = TimeSpan.FromSeconds(2),
                 DiscardOnBufferOverflow = true,
                 ReadFully = true,
             };

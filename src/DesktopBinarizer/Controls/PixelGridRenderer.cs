@@ -75,32 +75,45 @@ public static class PixelGridRenderer
             Marshal.Copy(sourceData.Scan0, sourcePixels, 0, sourceByteCount);
             Fill(outputPixels, outputData.Stride, output.Size, spacingColor);
 
-            int[] xMap = BuildSourceMap(renderSource.Width, scale, spacingWidth);
-            int[] yMap = BuildSourceMap(renderSource.Height, scale, spacingWidth);
-            for (int outputY = 0; outputY < output.Height; outputY++)
+            int outputRowBytes = output.Width * 4;
+            var renderedRow = new byte[outputRowBytes];
+            FillRow(renderedRow, spacingColor);
+            for (int sourceY = 0; sourceY < renderSource.Height; sourceY++)
             {
-                int sourceY = yMap[outputY];
-                if (sourceY < 0)
+                int sourceRow = sourceY * sourceData.Stride;
+                for (int sourceX = 0; sourceX < renderSource.Width; sourceX++)
                 {
-                    continue;
+                    int sourceOffset = sourceRow + (sourceX * 4);
+                    int startX =
+                        GetBoundary(sourceX, scale) +
+                        (sourceX * spacingWidth);
+                    int endX =
+                        GetBoundary(sourceX + 1, scale) +
+                        (sourceX * spacingWidth);
+                    for (int outputX = startX; outputX < endX; outputX++)
+                    {
+                        int outputOffset = outputX * 4;
+                        renderedRow[outputOffset] = sourcePixels[sourceOffset];
+                        renderedRow[outputOffset + 1] = sourcePixels[sourceOffset + 1];
+                        renderedRow[outputOffset + 2] = sourcePixels[sourceOffset + 2];
+                        renderedRow[outputOffset + 3] = 255;
+                    }
                 }
 
-                int sourceRow = sourceY * sourceData.Stride;
-                int outputRow = outputY * outputData.Stride;
-                for (int outputX = 0; outputX < output.Width; outputX++)
+                int startY =
+                    GetBoundary(sourceY, scale) +
+                    (sourceY * spacingWidth);
+                int endY =
+                    GetBoundary(sourceY + 1, scale) +
+                    (sourceY * spacingWidth);
+                for (int outputY = startY; outputY < endY; outputY++)
                 {
-                    int sourceX = xMap[outputX];
-                    if (sourceX < 0)
-                    {
-                        continue;
-                    }
-
-                    int sourceOffset = sourceRow + (sourceX * 4);
-                    int outputOffset = outputRow + (outputX * 4);
-                    outputPixels[outputOffset] = sourcePixels[sourceOffset];
-                    outputPixels[outputOffset + 1] = sourcePixels[sourceOffset + 1];
-                    outputPixels[outputOffset + 2] = sourcePixels[sourceOffset + 2];
-                    outputPixels[outputOffset + 3] = 255;
+                    Buffer.BlockCopy(
+                        renderedRow,
+                        0,
+                        outputPixels,
+                        outputY * outputData.Stride,
+                        outputRowBytes);
                 }
             }
 
@@ -128,40 +141,6 @@ public static class PixelGridRenderer
         }
     }
 
-    private static int[] BuildSourceMap(
-        int logicalPixelCount,
-        double scale,
-        int spacingWidth)
-    {
-        int outputLength =
-            CalculateOutputLength(logicalPixelCount, scale, spacingWidth);
-        int[] map = Enumerable.Repeat(-1, outputLength).ToArray();
-
-        for (int sourceIndex = 0; sourceIndex < logicalPixelCount; sourceIndex++)
-        {
-            int start =
-                GetBoundary(sourceIndex, scale) + (sourceIndex * spacingWidth);
-            int end =
-                GetBoundary(sourceIndex + 1, scale) + (sourceIndex * spacingWidth);
-            for (int outputIndex = start; outputIndex < end; outputIndex++)
-            {
-                map[outputIndex] = sourceIndex;
-            }
-        }
-
-        return map;
-    }
-
-    private static int CalculateOutputLength(
-        int logicalPixelCount,
-        double scale,
-        int spacingWidth)
-    {
-        return checked(
-            GetBoundary(logicalPixelCount, scale) +
-            ((logicalPixelCount - 1) * spacingWidth));
-    }
-
     private static int GetBoundary(int logicalPixelBoundary, double scale)
     {
         return Math.Max(
@@ -177,17 +156,27 @@ public static class PixelGridRenderer
         Size size,
         Color color)
     {
+        var rowPixels = new byte[size.Width * 4];
+        FillRow(rowPixels, color);
         for (int y = 0; y < size.Height; y++)
         {
-            int row = y * stride;
-            for (int x = 0; x < size.Width; x++)
-            {
-                int offset = row + (x * 4);
-                pixels[offset] = color.B;
-                pixels[offset + 1] = color.G;
-                pixels[offset + 2] = color.R;
-                pixels[offset + 3] = 255;
-            }
+            Buffer.BlockCopy(
+                rowPixels,
+                0,
+                pixels,
+                y * stride,
+                rowPixels.Length);
+        }
+    }
+
+    private static void FillRow(byte[] rowPixels, Color color)
+    {
+        for (int offset = 0; offset < rowPixels.Length; offset += 4)
+        {
+            rowPixels[offset] = color.B;
+            rowPixels[offset + 1] = color.G;
+            rowPixels[offset + 2] = color.R;
+            rowPixels[offset + 3] = 255;
         }
     }
 

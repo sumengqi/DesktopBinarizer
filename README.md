@@ -99,6 +99,7 @@ tools/ffmpeg/                          FFmpeg 依赖说明与本地生成目录
 录制使用 NAudio 进行 WASAPI 系统音频回环采集，并使用 FFmpeg 进行 H.264/AAC
 编码。FFmpeg 的许可证与构建说明位于发布目录的 `ffmpeg` 子目录。
 第三方组件说明见 `THIRD_PARTY_NOTICES.md`。
+项目变更记录见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 开源协议
 
