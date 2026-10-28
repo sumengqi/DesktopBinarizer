@@ -24,7 +24,7 @@ public sealed class ScreenColorPickerForm : Form
         KeyPreview = true;
         DoubleBuffered = true;
         Cursor = Cursors.Cross;
-        Text = "屏幕取色";
+        Text = AppLocalizer.Get("ScreenColorPicker");
 
         _currentPoint = PointToClient(Cursor.Position);
         MouseMove += (_, eventArgs) =>
@@ -238,7 +238,7 @@ public sealed class ScreenColorPickerForm : Form
             TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
         TextRenderer.DrawText(
             graphics,
-            "左键选择",
+            AppLocalizer.Get("LeftClickSelect"),
             Font,
             new Rectangle(
                 detailsLeft,
@@ -249,7 +249,7 @@ public sealed class ScreenColorPickerForm : Form
             TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
         TextRenderer.DrawText(
             graphics,
-            "右键 / Esc 取消",
+            AppLocalizer.Get("RightClickCancel"),
             Font,
             new Rectangle(
                 detailsLeft,

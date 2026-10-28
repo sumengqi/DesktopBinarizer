@@ -40,7 +40,8 @@ public sealed class VideoRecorder : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(options);
         if (IsRecording)
         {
-            throw new InvalidOperationException("录制已经开始。");
+            throw new InvalidOperationException(
+                AppLocalizer.Get("RecordingAlreadyStarted"));
         }
 
         ValidateOptions(options);
@@ -141,8 +142,12 @@ public sealed class VideoRecorder : IAsyncDisposable
 
         if (frame.Width != _width || frame.Height != _height)
         {
-            throw new InvalidOperationException(
-                $"录制帧尺寸必须为 {_width} × {_height}，当前为 {frame.Width} × {frame.Height}。");
+            throw new InvalidOperationException(AppLocalizer.Format(
+                "FrameSizeMismatch",
+                _width,
+                _height,
+                frame.Width,
+                frame.Height));
         }
 
         byte[] pixels = CopyBgraPixels(frame);
@@ -183,8 +188,7 @@ public sealed class VideoRecorder : IAsyncDisposable
         }
 
         throw new FileNotFoundException(
-            "未找到 FFmpeg。请运行 scripts/Setup-FFmpeg.ps1，" +
-            "或将 ffmpeg.exe 加入系统 PATH。",
+            AppLocalizer.Get("FfmpegNotFound"),
             bundledPath);
     }
 
@@ -227,7 +231,7 @@ public sealed class VideoRecorder : IAsyncDisposable
                 {
                     _ffmpegProcess.Kill(entireProcessTree: true);
                     await _ffmpegProcess.WaitForExitAsync();
-                    throw new TimeoutException("FFmpeg 未能及时完成视频文件写入。");
+                    throw new TimeoutException(AppLocalizer.Get("FfmpegTimeout"));
                 }
 
                 if (_ffmpegErrorTask is not null)
@@ -237,8 +241,10 @@ public sealed class VideoRecorder : IAsyncDisposable
 
                 if (_ffmpegProcess.ExitCode != 0)
                 {
-                    throw new InvalidOperationException(
-                        $"FFmpeg 录制失败（退出码 {_ffmpegProcess.ExitCode}）：{errorOutput.Trim()}");
+                    throw new InvalidOperationException(AppLocalizer.Format(
+                        "FfmpegRecordingFailed",
+                        _ffmpegProcess.ExitCode,
+                        errorOutput.Trim()));
                 }
             }
         }
@@ -263,7 +269,9 @@ public sealed class VideoRecorder : IAsyncDisposable
     {
         if (string.IsNullOrWhiteSpace(options.OutputPath))
         {
-            throw new ArgumentException("必须指定录制文件路径。", nameof(options));
+            throw new ArgumentException(
+                AppLocalizer.Get("RecordingPathRequired"),
+                nameof(options));
         }
 
         if (options.Width is < 1 or > 8192 ||
@@ -271,14 +279,14 @@ public sealed class VideoRecorder : IAsyncDisposable
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
-                "录制尺寸必须在 1 到 8192 之间。");
+                AppLocalizer.Get("RecordingSizeRange"));
         }
 
         if (options.FramesPerSecond is < 1 or > 240)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
-                "录制帧率必须在 1 到 240 FPS 之间。");
+                AppLocalizer.Get("RecordingFrameRateRange"));
         }
     }
 
@@ -372,7 +380,7 @@ public sealed class VideoRecorder : IAsyncDisposable
         startInfo.ArgumentList.Add(options.OutputPath);
 
         return Process.Start(startInfo)
-            ?? throw new InvalidOperationException("无法启动 FFmpeg。");
+            ?? throw new InvalidOperationException(AppLocalizer.Get("CannotStartFfmpeg"));
     }
 
     private static string GetAudioInputFormat(WaveFormat format)
@@ -401,7 +409,8 @@ public sealed class VideoRecorder : IAsyncDisposable
             }
         }
 
-        throw new NotSupportedException($"不支持系统音频格式：{format}");
+        throw new NotSupportedException(
+            AppLocalizer.Format("UnsupportedAudioFormat", format));
     }
 
     private static string GetPcmFormat(int bitsPerSample)
@@ -413,7 +422,7 @@ public sealed class VideoRecorder : IAsyncDisposable
             24 => "s24le",
             32 => "s32le",
             _ => throw new NotSupportedException(
-                $"不支持 {bitsPerSample} 位 PCM 系统音频。"),
+                AppLocalizer.Format("UnsupportedPcmFormat", bitsPerSample)),
         };
     }
 

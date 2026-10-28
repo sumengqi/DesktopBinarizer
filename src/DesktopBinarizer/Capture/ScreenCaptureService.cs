@@ -121,7 +121,8 @@ public sealed class ScreenCaptureService : IDisposable
             rect.Width <= 0 ||
             rect.Height <= 0)
         {
-            throw new InvalidOperationException("目标窗口已关闭或尺寸无效。");
+            throw new InvalidOperationException(
+                AppLocalizer.Get("TargetWindowUnavailable"));
         }
 
         var bitmap = new Bitmap(rect.Width, rect.Height, PixelFormat.Format32bppArgb);
@@ -181,7 +182,8 @@ public sealed class ScreenCaptureService : IDisposable
         if (screenDc == nint.Zero)
         {
             bitmap.Dispose();
-            throw new InvalidOperationException("无法获取桌面设备上下文。");
+            throw new InvalidOperationException(
+                AppLocalizer.Get("CannotGetDesktopContext"));
         }
 
         try
@@ -202,7 +204,8 @@ public sealed class ScreenCaptureService : IDisposable
                     NativeMethods.SrcCopy | NativeMethods.CaptureBlt);
                 if (!succeeded)
                 {
-                    throw new InvalidOperationException("桌面画面复制失败。");
+                    throw new InvalidOperationException(
+                        AppLocalizer.Get("DesktopCopyFailed"));
                 }
             }
             finally

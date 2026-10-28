@@ -32,7 +32,7 @@ public sealed class PalettePreview : Control
         {
             TextRenderer.DrawText(
                 e.Graphics,
-                "无颜色",
+                AppLocalizer.Get("NoColors"),
                 Font,
                 bounds,
                 Color.DimGray,

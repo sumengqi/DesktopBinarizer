@@ -18,8 +18,13 @@ public sealed class MainForm : Form
 
     private readonly ScreenCaptureService _captureService = new();
     private readonly VideoRecorder _recorder = new();
+    private readonly Action<AppLanguage> _saveLanguagePreference;
     private readonly System.Windows.Forms.Timer _captureTimer = new();
     private readonly System.Windows.Forms.Timer _recordingStatusTimer = new();
+    private readonly MenuStrip _menuStrip = new();
+    private readonly ToolStripMenuItem _languageMenuItem = new();
+    private readonly ToolStripMenuItem _chineseMenuItem = new();
+    private readonly ToolStripMenuItem _englishMenuItem = new();
     private readonly ComboBox _sourceComboBox = new();
     private readonly ComboBox _windowComboBox = new();
     private readonly Button _refreshWindowsButton = new();
@@ -77,8 +82,16 @@ public sealed class MainForm : Form
     private bool _closeCommitted;
 
     public MainForm()
+        : this(language => AppPreferencesFile.Save(
+            new AppPreferences { Language = language }))
     {
-        Text = "桌面色彩量化实时预览";
+    }
+
+    internal MainForm(Action<AppLanguage> saveLanguagePreference)
+    {
+        ArgumentNullException.ThrowIfNull(saveLanguagePreference);
+        _saveLanguagePreference = saveLanguagePreference;
+        Text = AppLocalizer.Get("AppTitle");
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new Size(1040, 700);
         ClientSize = new Size(1260, 840);
@@ -130,23 +143,25 @@ public sealed class MainForm : Form
 
         var title = new Label
         {
-            Text = "实时色彩量化",
+            Text = AppLocalizer.Get("HeaderTitle"),
+            Tag = new LocalizedTextTag("HeaderTitle"),
             AutoSize = true,
             Font = new Font(Font.FontFamily, 16F, FontStyle.Bold),
             Margin = new Padding(0, 0, 0, 4),
         };
         var subtitle = new Label
         {
-            Text = "灰度、低位深 RGB、自定义调色板与视频录制",
+            Text = AppLocalizer.Get("Subtitle"),
+            Tag = new LocalizedTextTag("Subtitle"),
             AutoSize = true,
             ForeColor = Color.DimGray,
             Margin = new Padding(0, 0, 0, 20),
         };
 
-        _importConfigurationButton.Text = "导入配置";
+        SetLocalizedText(_importConfigurationButton, "ImportConfiguration");
         _importConfigurationButton.AutoSize = true;
         _importConfigurationButton.Dock = DockStyle.Fill;
-        _exportConfigurationButton.Text = "导出配置";
+        SetLocalizedText(_exportConfigurationButton, "ExportConfiguration");
         _exportConfigurationButton.AutoSize = true;
         _exportConfigurationButton.Dock = DockStyle.Fill;
         var configurationButtons = new TableLayoutPanel
@@ -161,17 +176,17 @@ public sealed class MainForm : Form
         configurationButtons.Controls.Add(_importConfigurationButton, 0, 0);
         configurationButtons.Controls.Add(_exportConfigurationButton, 1, 0);
 
-        ConfigureComboBox(_sourceComboBox, ["整个桌面", "指定窗口"], 0);
-        ConfigureComboBox(
+        ConfigureLocalizedComboBox(_sourceComboBox, ["Desktop", "Window"], 0);
+        ConfigureLocalizedComboBox(
             _inputScaleModeComboBox,
-            ["按比例缩放（完整画面）", "全屏拉伸（铺满输出）"],
+            ["ScaleProportional", "ScaleStretch"],
             0);
 
         _windowComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
         _windowComboBox.Dock = DockStyle.Fill;
         _windowComboBox.Enabled = false;
 
-        _refreshWindowsButton.Text = "刷新";
+        SetLocalizedText(_refreshWindowsButton, "Refresh");
         _refreshWindowsButton.AutoSize = true;
         _refreshWindowsButton.Enabled = false;
 
@@ -179,9 +194,9 @@ public sealed class MainForm : Form
         windowSelector.Controls.Add(_windowComboBox, 0, 0);
         windowSelector.Controls.Add(_refreshWindowsButton, 1, 0);
 
-        ConfigureComboBox(
+        ConfigureLocalizedComboBox(
             _outputSizeModeComboBox,
-            ["自定义", "跟随输入", "输入尺寸倍数"],
+            ["OutputCustom", "OutputFollowInput", "OutputInputMultiplier"],
             0);
         ConfigureDimensionInput(_outputWidthInput, 400);
         ConfigureDimensionInput(_outputHeightInput, 300);
@@ -211,37 +226,37 @@ public sealed class MainForm : Form
             ["0.25×", "0.5×", "0.75×", "1×", "1.5×", "2×", "3×", "4×"],
             3);
 
-        _resolvedOutputLabel.Text = "当前输出：400 × 300";
+        _resolvedOutputLabel.Text = AppLocalizer.Format("CurrentOutput", 400, 300);
         _resolvedOutputLabel.AutoSize = true;
         _resolvedOutputLabel.ForeColor = Color.DimGray;
         _resolvedOutputLabel.Margin = new Padding(0, 6, 0, 0);
 
-        ConfigureComboBox(
+        ConfigureLocalizedComboBox(
             _previewScaleComboBox,
             [
-                "适应窗口",
-                "0.125×",
-                "0.25×",
-                "0.333×",
-                "0.5×",
-                "1×",
-                "2×",
-                "3×",
-                "4×",
-                "8×",
+                "PreviewFit",
+                "Preview0125",
+                "Preview025",
+                "Preview0333",
+                "Preview05",
+                "Preview1",
+                "Preview2",
+                "Preview3",
+                "Preview4",
+                "Preview8",
             ],
             0);
-        _showOriginalPreviewCheckBox.Text = "同时显示原画面预览";
+        SetLocalizedText(_showOriginalPreviewCheckBox, "ShowOriginalPreview");
         _showOriginalPreviewCheckBox.AutoSize = true;
         _showOriginalPreviewCheckBox.Margin = new Padding(0, 8, 0, 0);
 
-        ConfigureComboBox(
+        ConfigureLocalizedComboBox(
             _colorModeComboBox,
             [
-                "灰度（1 bit 为二值化）",
-                "RGB 等位深（每通道 1–8 bit）",
-                "RGB 分通道位深",
-                "自定义调色板",
+                "ColorModeGrayscale",
+                "ColorModeRgbUniform",
+                "ColorModeRgbPerChannel",
+                "ColorModeCustomPalette",
             ],
             (int)ColorQuantizationMode.Grayscale);
 
@@ -253,14 +268,14 @@ public sealed class MainForm : Form
 
         ConfigureSingleOptionPanel(
             _grayscaleOptionsPanel,
-            "灰度位深",
+            "GrayscaleDepth",
             _grayscaleBitsInput,
-            "1–8 bit");
+            "BitRange");
         ConfigureSingleOptionPanel(
             _rgbUniformOptionsPanel,
-            "每通道位深",
+            "PerChannelDepth",
             _rgbBitsInput,
-            "R/G/B 同值");
+            "SameRgb");
 
         _rgbPerChannelOptionsPanel.Dock = DockStyle.Top;
         _rgbPerChannelOptionsPanel.AutoSize = true;
@@ -270,15 +285,15 @@ public sealed class MainForm : Form
         _rgbPerChannelOptionsPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33F));
         _rgbPerChannelOptionsPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.34F));
         _rgbPerChannelOptionsPanel.Controls.Add(
-            CreateLabeledControl("红色 R（bit）", _redBitsInput),
+            CreateLabeledControl("RedDepth", _redBitsInput),
             0,
             0);
         _rgbPerChannelOptionsPanel.Controls.Add(
-            CreateLabeledControl("绿色 G（bit）", _greenBitsInput),
+            CreateLabeledControl("GreenDepth", _greenBitsInput),
             1,
             0);
         _rgbPerChannelOptionsPanel.Controls.Add(
-            CreateLabeledControl("蓝色 B（bit）", _blueBitsInput),
+            CreateLabeledControl("BlueDepth", _blueBitsInput),
             2,
             0);
 
@@ -291,7 +306,7 @@ public sealed class MainForm : Form
 
         _palettePreview.Dock = DockStyle.Fill;
         _palettePreview.Colors = _customPalette.ToArray();
-        _paletteCountLabel.Text = "2 种颜色";
+        _paletteCountLabel.Text = AppLocalizer.Format("ColorCount", 2);
         _paletteCountLabel.AutoSize = true;
         _paletteCountLabel.ForeColor = Color.DimGray;
         _paletteCountLabel.Margin = new Padding(0, 5, 0, 0);
@@ -306,7 +321,7 @@ public sealed class MainForm : Form
         paletteVisual.Controls.Add(_palettePreview);
         paletteVisual.Controls.Add(_paletteCountLabel);
 
-        _editPaletteButton.Text = "编辑调色板";
+        SetLocalizedText(_editPaletteButton, "EditPalette");
         _editPaletteButton.AutoSize = true;
         _editPaletteButton.Anchor = AnchorStyles.Top;
         _editPaletteButton.Margin = new Padding(8, 0, 0, 0);
@@ -324,7 +339,7 @@ public sealed class MainForm : Form
         _thresholdValueLabel.ForeColor = Color.DimGray;
 
         var thresholdHeader = CreateTwoColumnLayout();
-        thresholdHeader.Controls.Add(CreateSectionLabel("二值化阈值"), 0, 0);
+        thresholdHeader.Controls.Add(CreateSectionLabel("BinaryThreshold"), 0, 0);
         thresholdHeader.Controls.Add(_thresholdValueLabel, 1, 0);
 
         _thresholdOptionsPanel.Dock = DockStyle.Top;
@@ -334,24 +349,24 @@ public sealed class MainForm : Form
         _thresholdOptionsPanel.Controls.Add(thresholdHeader);
         _thresholdOptionsPanel.Controls.Add(_thresholdTrackBar);
 
-        ConfigureComboBox(
+        ConfigureLocalizedComboBox(
             _ditherAlgorithmComboBox,
             [
-                "无（普通阈值）",
-                "Floyd–Steinberg",
-                "Atkinson",
-                "Jarvis–Judice–Ninke",
-                "Stucki",
-                "Burkes",
-                "Sierra Lite",
+                "DitherNone",
+                "DitherFloydSteinberg",
+                "DitherAtkinson",
+                "DitherJarvisJudiceNinke",
+                "DitherStucki",
+                "DitherBurkes",
+                "DitherSierraLite",
             ],
             (int)DitherAlgorithm.FloydSteinberg);
 
-        _invertCheckBox.Text = "颜色反相";
+        SetLocalizedText(_invertCheckBox, "InvertColors");
         _invertCheckBox.AutoSize = true;
         _invertCheckBox.Margin = new Padding(0, 10, 0, 18);
 
-        _pixelSpacingCheckBox.Text = "启用像素间距";
+        SetLocalizedText(_pixelSpacingCheckBox, "EnablePixelSpacing");
         _pixelSpacingCheckBox.AutoSize = true;
         _pixelSpacingCheckBox.Margin = new Padding(0, 0, 0, 8);
 
@@ -368,7 +383,7 @@ public sealed class MainForm : Form
         _pixelSpacingColorComboBox.DrawItem += DrawColorComboItem;
         RefreshPixelSpacingColors();
 
-        _editSpacingPaletteButton.Text = "编辑调色板";
+        SetLocalizedText(_editSpacingPaletteButton, "EditPalette");
         _editSpacingPaletteButton.AutoSize = true;
         _editSpacingPaletteButton.Dock = DockStyle.Fill;
 
@@ -382,7 +397,8 @@ public sealed class MainForm : Form
         _pixelSpacingOptionsPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         _pixelSpacingOptionsPanel.Controls.Add(new Label
         {
-            Text = "间距宽度",
+            Text = AppLocalizer.Get("SpacingWidth"),
+            Tag = new LocalizedTextTag("SpacingWidth"),
             AutoSize = true,
             Anchor = AnchorStyles.Left,
             Margin = new Padding(0, 6, 8, 0),
@@ -397,7 +413,8 @@ public sealed class MainForm : Form
         }, 2, 0);
         _pixelSpacingOptionsPanel.Controls.Add(new Label
         {
-            Text = "间距颜色",
+            Text = AppLocalizer.Get("SpacingColor"),
+            Tag = new LocalizedTextTag("SpacingColor"),
             AutoSize = true,
             Anchor = AnchorStyles.Left,
             Margin = new Padding(0, 10, 8, 0),
@@ -410,12 +427,12 @@ public sealed class MainForm : Form
             FrameRates.Select(rate => $"{rate} FPS").Cast<object>().ToArray(),
             Array.IndexOf(FrameRates, 30));
 
-        _captureSystemAudioCheckBox.Text = "录制系统当前输出的声音（WASAPI 回环）";
+        SetLocalizedText(_captureSystemAudioCheckBox, "CaptureSystemAudio");
         _captureSystemAudioCheckBox.Checked = true;
         _captureSystemAudioCheckBox.AutoSize = true;
         _captureSystemAudioCheckBox.Margin = new Padding(0, 10, 0, 0);
 
-        _recordButton.Text = "开始录制 MP4";
+        SetLocalizedText(_recordButton, "StartRecording");
         _recordButton.AutoSize = true;
         _recordButton.Dock = DockStyle.Top;
         _recordButton.Margin = new Padding(0, 8, 0, 0);
@@ -423,11 +440,11 @@ public sealed class MainForm : Form
         _recordButton.ForeColor = Color.White;
         _recordButton.FlatStyle = FlatStyle.Flat;
 
-        _pauseButton.Text = "暂停";
+        SetLocalizedText(_pauseButton, "Pause");
         _pauseButton.AutoSize = true;
         _pauseButton.Dock = DockStyle.Fill;
 
-        _saveButton.Text = "保存当前帧";
+        SetLocalizedText(_saveButton, "SaveCurrentFrame");
         _saveButton.AutoSize = true;
         _saveButton.Dock = DockStyle.Fill;
 
@@ -446,26 +463,26 @@ public sealed class MainForm : Form
         settings.Controls.Add(title);
         settings.Controls.Add(subtitle);
         settings.Controls.Add(configurationButtons);
-        settings.Controls.Add(CreateSectionLabel("抓取来源"));
+        settings.Controls.Add(CreateSectionLabel("SectionCaptureSource"));
         settings.Controls.Add(_sourceComboBox);
         settings.Controls.Add(CreateSpacer(8));
         settings.Controls.Add(windowSelector);
         settings.Controls.Add(CreateSpacer(12));
-        settings.Controls.Add(CreateSectionLabel("输入画面适配"));
+        settings.Controls.Add(CreateSectionLabel("SectionInputScaling"));
         settings.Controls.Add(_inputScaleModeComboBox);
         settings.Controls.Add(CreateSpacer(18));
-        settings.Controls.Add(CreateSectionLabel("输出分辨率"));
+        settings.Controls.Add(CreateSectionLabel("SectionOutputResolution"));
         settings.Controls.Add(_outputSizeModeComboBox);
         settings.Controls.Add(CreateSpacer(6));
         settings.Controls.Add(resolutionSelector);
         settings.Controls.Add(_outputMultiplierComboBox);
         settings.Controls.Add(_resolvedOutputLabel);
         settings.Controls.Add(CreateSpacer(18));
-        settings.Controls.Add(CreateSectionLabel("预览缩放"));
+        settings.Controls.Add(CreateSectionLabel("SectionPreviewScale"));
         settings.Controls.Add(_previewScaleComboBox);
         settings.Controls.Add(_showOriginalPreviewCheckBox);
         settings.Controls.Add(CreateSpacer(18));
-        settings.Controls.Add(CreateSectionLabel("颜色输出模式"));
+        settings.Controls.Add(CreateSectionLabel("SectionColorMode"));
         settings.Controls.Add(_colorModeComboBox);
         settings.Controls.Add(_grayscaleOptionsPanel);
         settings.Controls.Add(_rgbUniformOptionsPanel);
@@ -473,14 +490,14 @@ public sealed class MainForm : Form
         settings.Controls.Add(_paletteOptionsPanel);
         settings.Controls.Add(_thresholdOptionsPanel);
         settings.Controls.Add(CreateSpacer(14));
-        settings.Controls.Add(CreateSectionLabel("量化误差扩散算法"));
+        settings.Controls.Add(CreateSectionLabel("SectionDithering"));
         settings.Controls.Add(_ditherAlgorithmComboBox);
         settings.Controls.Add(_invertCheckBox);
-        settings.Controls.Add(CreateSectionLabel("液晶像素间距"));
+        settings.Controls.Add(CreateSectionLabel("SectionPixelSpacing"));
         settings.Controls.Add(_pixelSpacingCheckBox);
         settings.Controls.Add(_pixelSpacingOptionsPanel);
         settings.Controls.Add(CreateSpacer(18));
-        settings.Controls.Add(CreateSectionLabel("抓取与录制帧率"));
+        settings.Controls.Add(CreateSectionLabel("SectionFrameRate"));
         settings.Controls.Add(_frameRateComboBox);
         settings.Controls.Add(_captureSystemAudioCheckBox);
         settings.Controls.Add(_recordButton);
@@ -501,14 +518,14 @@ public sealed class MainForm : Form
         _previewLayout.Controls.Add(
             ConfigurePreviewContainer(
                 _originalPreviewContainer,
-                "原画面",
+                "OriginalPreview",
                 _originalPreview),
             0,
             0);
         _previewLayout.Controls.Add(
             ConfigurePreviewContainer(
                 new TableLayoutPanel(),
-                "输出画面",
+                "OutputPreview",
                 _preview),
             1,
             0);
@@ -519,7 +536,7 @@ public sealed class MainForm : Form
             SizingGrip = false,
             BackColor = Color.White,
         };
-        _statusLabel.Text = "准备就绪";
+        _statusLabel.Text = AppLocalizer.Get("Ready");
         _statusLabel.Spring = true;
         _statusLabel.TextAlign = ContentAlignment.MiddleLeft;
         _recordingTimeLabel.Text = string.Empty;
@@ -534,10 +551,97 @@ public sealed class MainForm : Form
         root.Controls.Add(statusStrip, 0, 1);
         root.SetColumnSpan(statusStrip, 2);
         Controls.Add(root);
+        BuildLanguageMenu();
+        Controls.Add(_menuStrip);
+        MainMenuStrip = _menuStrip;
+        _menuStrip.BringToFront();
+    }
+
+    private void BuildLanguageMenu()
+    {
+        _menuStrip.BackColor = Color.White;
+        _menuStrip.Items.Add(_languageMenuItem);
+        _languageMenuItem.DropDownItems.Add(_chineseMenuItem);
+        _languageMenuItem.DropDownItems.Add(_englishMenuItem);
+        UpdateLanguageMenu();
+    }
+
+    private void ChangeLanguage(AppLanguage language)
+    {
+        if (AppLocalizer.Language == language)
+        {
+            return;
+        }
+
+        AppLocalizer.Language = language;
+        ApplyLocalizedControls(this);
+        UpdateLanguageMenu();
+        Text = AppLocalizer.Get("AppTitle");
+        _paletteCountLabel.Text = AppLocalizer.Format("ColorCount", _customPalette.Count);
+        _pauseButton.Text = AppLocalizer.Get(_isPaused ? "Resume" : "Pause");
+        _recordButton.Text = AppLocalizer.Get(
+            _recorder.IsRecording ? "StopRecording" : "StartRecording");
+        _statusLabel.Text = AppLocalizer.Get(
+            _recorder.IsRecording
+                ? "RecordingActive"
+                : _isPaused
+                    ? "Paused"
+                    : "Ready");
+        UpdateOutputControls();
+        _preview.Invalidate();
+        _originalPreview.Invalidate();
+        _palettePreview.Invalidate();
+        PerformLayout();
+
+        try
+        {
+            _saveLanguagePreference(language);
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(
+                this,
+                AppLocalizer.Format("PreferenceSaveError", exception.Message),
+                AppLocalizer.Get("Information"),
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+        }
+    }
+
+    private void UpdateLanguageMenu()
+    {
+        _languageMenuItem.Text = AppLocalizer.Get("Language");
+        _chineseMenuItem.Text = AppLocalizer.Get("ChineseSimplified");
+        _englishMenuItem.Text = AppLocalizer.Get("English");
+        _chineseMenuItem.Checked =
+            AppLocalizer.Language == AppLanguage.ChineseSimplified;
+        _englishMenuItem.Checked = AppLocalizer.Language == AppLanguage.English;
+    }
+
+    private static void ApplyLocalizedControls(Control parent)
+    {
+        if (parent.Tag is LocalizedTextTag textTag)
+        {
+            parent.Text = AppLocalizer.Get(textTag.Key);
+        }
+        else if (parent is ComboBox comboBox &&
+                 parent.Tag is LocalizedItemsTag itemsTag)
+        {
+            ReplaceLocalizedItems(comboBox, itemsTag.Keys);
+        }
+
+        foreach (Control child in parent.Controls)
+        {
+            ApplyLocalizedControls(child);
+        }
     }
 
     private void WireEvents()
     {
+        _chineseMenuItem.Click += (_, _) => ChangeLanguage(AppLanguage.ChineseSimplified);
+        _englishMenuItem.Click += (_, _) => ChangeLanguage(AppLanguage.English);
+
         _sourceComboBox.SelectedIndexChanged += (_, _) =>
         {
             bool windowMode = _sourceComboBox.SelectedIndex == 1;
@@ -578,8 +682,8 @@ public sealed class MainForm : Form
         _pauseButton.Click += (_, _) =>
         {
             _isPaused = !_isPaused;
-            _pauseButton.Text = _isPaused ? "继续" : "暂停";
-            _statusLabel.Text = _isPaused ? "已暂停" : "正在抓取";
+            _pauseButton.Text = AppLocalizer.Get(_isPaused ? "Resume" : "Pause");
+            _statusLabel.Text = AppLocalizer.Get(_isPaused ? "Paused" : "Capturing");
         };
 
         _recordButton.Click += async (_, _) =>
@@ -603,12 +707,20 @@ public sealed class MainForm : Form
         _recordingStatusTimer.Tick += (_, _) =>
             _recordingTimeLabel.Text = $"● REC {_recorder.Elapsed:hh\\:mm\\:ss}";
         FormClosing += MainFormOnFormClosing;
-        FormClosed += (_, _) =>
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
         {
+            _captureTimer.Dispose();
+            _recordingStatusTimer.Dispose();
             _captureService.Dispose();
             _latestOutputFrame?.Dispose();
             _latestOutputFrame = null;
-        };
+        }
+
+        base.Dispose(disposing);
     }
 
     private async void CaptureTimerOnTick(object? sender, EventArgs e)
@@ -622,7 +734,7 @@ public sealed class MainForm : Form
         WindowInfo? selectedWindow = _windowComboBox.SelectedItem as WindowInfo;
         if (captureWindow && selectedWindow is null)
         {
-            _statusLabel.Text = "请选择一个目标窗口";
+            _statusLabel.Text = AppLocalizer.Get("SelectTargetWindow");
             return;
         }
 
@@ -751,17 +863,29 @@ public sealed class MainForm : Form
                 }
             }
             _resolvedOutputLabel.Text = settings.EnablePixelSpacing
-                ? $"输入：{inputSize.Width} × {inputSize.Height}  " +
-                  $"量化：{logicalOutputSize.Width} × {logicalOutputSize.Height}  " +
-                  $"最终：{processed.Width} × {processed.Height}"
-                : $"输入：{inputSize.Width} × {inputSize.Height}  " +
-                  $"当前输出：{processed.Width} × {processed.Height}";
+                ? AppLocalizer.Format(
+                    "CaptureDimensions",
+                    inputSize.Width,
+                    inputSize.Height,
+                    logicalOutputSize.Width,
+                    logicalOutputSize.Height,
+                    processed.Width,
+                    processed.Height)
+                : AppLocalizer.Format(
+                    "CaptureOutputDimensions",
+                    inputSize.Width,
+                    inputSize.Height,
+                    processed.Width,
+                    processed.Height);
             string sourceDescription = captureWindow
-                ? $"窗口：{selectedWindow!.Title}"
-                : "来源：整个桌面";
-            _statusLabel.Text =
-                $"{sourceDescription} | {GetColorModeDescription(settings)} | " +
-                $"{processed.Width} × {processed.Height}";
+                ? AppLocalizer.Format("SourceWindow", selectedWindow!.Title)
+                : AppLocalizer.Get("SourceDesktop");
+            _statusLabel.Text = AppLocalizer.Format(
+                "CaptureStatus",
+                sourceDescription,
+                GetColorModeDescription(settings),
+                processed.Width,
+                processed.Height);
             _frameTimeLabel.Text = $"{stopwatch.ElapsedMilliseconds} ms";
         }
         catch (Exception exception)
@@ -782,14 +906,17 @@ public sealed class MainForm : Form
     {
         if (_latestOutputFrame is null)
         {
-            MessageBox.Show(this, "请等待首帧画面生成后再开始录制。", "提示");
+            MessageBox.Show(
+                this,
+                AppLocalizer.Get("WaitForFirstFrame"),
+                AppLocalizer.Get("Information"));
             return;
         }
 
         using var dialog = new SaveFileDialog
         {
-            Title = "保存量化视频",
-            Filter = "MP4 视频|*.mp4",
+            Title = AppLocalizer.Get("SaveQuantizedVideo"),
+            Filter = AppLocalizer.Get("Mp4VideoFilter"),
             DefaultExt = "mp4",
             AddExtension = true,
             FileName = $"quantized-recording-{DateTime.Now:yyyyMMdd-HHmmss}.mp4",
@@ -812,18 +939,18 @@ public sealed class MainForm : Form
             _recorder.SubmitFrame(_latestOutputFrame);
 
             SetRecordingControlsEnabled(false);
-            _recordButton.Text = "停止录制";
+            _recordButton.Text = AppLocalizer.Get("StopRecording");
             _recordButton.BackColor = Color.FromArgb(130, 30, 30);
             _recordingStatusTimer.Start();
             _recordingTimeLabel.Text = "● REC 00:00:00";
-            _statusLabel.Text = $"正在录制：{dialog.FileName}";
+            _statusLabel.Text = AppLocalizer.Format("RecordingPath", dialog.FileName);
         }
         catch (Exception exception)
         {
             MessageBox.Show(
                 this,
-                $"无法开始录制：{exception.Message}",
-                "录制错误",
+                AppLocalizer.Format("CannotStartRecording", exception.Message),
+                AppLocalizer.Get("RecordingError"),
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
         }
@@ -837,28 +964,28 @@ public sealed class MainForm : Form
         }
 
         _recordButton.Enabled = false;
-        _statusLabel.Text = "正在完成视频文件写入...";
+        _statusLabel.Text = AppLocalizer.Get("FinalizingVideo");
 
         try
         {
             await _recorder.StopAsync();
-            _statusLabel.Text = "录制已完成";
+            _statusLabel.Text = AppLocalizer.Get("RecordingCompleted");
         }
         catch (Exception exception)
         {
             MessageBox.Show(
                 this,
-                $"停止录制时发生错误：{exception.Message}",
-                "录制错误",
+                AppLocalizer.Format("StopRecordingError", exception.Message),
+                AppLocalizer.Get("RecordingError"),
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
-            _statusLabel.Text = "录制失败";
+            _statusLabel.Text = AppLocalizer.Get("RecordingFailed");
         }
         finally
         {
             _recordingStatusTimer.Stop();
             _recordingTimeLabel.Text = string.Empty;
-            _recordButton.Text = "开始录制 MP4";
+            _recordButton.Text = AppLocalizer.Get("StartRecording");
             _recordButton.BackColor = Color.FromArgb(215, 55, 55);
             _recordButton.Enabled = true;
             SetRecordingControlsEnabled(true);
@@ -908,10 +1035,15 @@ public sealed class MainForm : Form
         _resolvedOutputLabel.Text = mode switch
         {
             OutputSizeMode.Custom =>
-                $"当前输出：{_outputWidthInput.Value:0} × {_outputHeightInput.Value:0}",
-            OutputSizeMode.FollowInput => "当前输出：跟随输入尺寸",
+                AppLocalizer.Format(
+                    "CurrentOutput",
+                    _outputWidthInput.Value.ToString("0"),
+                    _outputHeightInput.Value.ToString("0")),
+            OutputSizeMode.FollowInput => AppLocalizer.Get("CurrentOutputFollow"),
             OutputSizeMode.InputMultiplier =>
-                $"当前输出：输入尺寸的 {_outputMultiplierComboBox.SelectedItem}",
+                AppLocalizer.Format(
+                    "CurrentOutputMultiplier",
+                    _outputMultiplierComboBox.SelectedItem ?? string.Empty),
             _ => string.Empty,
         };
     }
@@ -947,7 +1079,7 @@ public sealed class MainForm : Form
         _customPalette.Clear();
         _customPalette.AddRange(dialog.Palette);
         _palettePreview.Colors = _customPalette.ToArray();
-        _paletteCountLabel.Text = $"{_customPalette.Count} 种颜色";
+        _paletteCountLabel.Text = AppLocalizer.Format("ColorCount", _customPalette.Count);
         RefreshPixelSpacingColors();
     }
 
@@ -1007,7 +1139,10 @@ public sealed class MainForm : Form
         if (_outputSizeModeComboBox.SelectedIndex == (int)OutputSizeMode.Custom)
         {
             _resolvedOutputLabel.Text =
-                $"当前输出：{_outputWidthInput.Value:0} × {_outputHeightInput.Value:0}";
+                AppLocalizer.Format(
+                    "CurrentOutput",
+                    _outputWidthInput.Value.ToString("0"),
+                    _outputHeightInput.Value.ToString("0"));
         }
     }
 
@@ -1045,7 +1180,7 @@ public sealed class MainForm : Form
 
         if (_sourceComboBox.SelectedIndex == 1)
         {
-            _statusLabel.Text = $"找到 {windows.Count} 个可抓取窗口";
+            _statusLabel.Text = AppLocalizer.Format("FoundWindows", windows.Count);
         }
     }
 
@@ -1056,8 +1191,8 @@ public sealed class MainForm : Form
 
         using var dialog = new SaveFileDialog
         {
-            Title = "导出色彩量化配置",
-            Filter = "色彩量化配置|*.dbconfig.json|JSON 文件|*.json",
+            Title = AppLocalizer.Get("ExportConfigurationTitle"),
+            Filter = AppLocalizer.Get("ConfigurationSaveFilter"),
             DefaultExt = "dbconfig.json",
             AddExtension = true,
             FileName = $"desktop-binarizer-{DateTime.Now:yyyyMMdd-HHmmss}.dbconfig.json",
@@ -1070,14 +1205,14 @@ public sealed class MainForm : Form
         try
         {
             ConfigurationFile.Save(dialog.FileName, CreateConfiguration());
-            _statusLabel.Text = $"配置已导出：{dialog.FileName}";
+            _statusLabel.Text = AppLocalizer.Format("ConfigurationExported", dialog.FileName);
         }
         catch (Exception exception)
         {
             MessageBox.Show(
                 this,
-                $"无法导出配置：{exception.Message}",
-                "配置导出错误",
+                AppLocalizer.Format("CannotExportConfiguration", exception.Message),
+                AppLocalizer.Get("ConfigurationExportError"),
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
         }
@@ -1087,14 +1222,17 @@ public sealed class MainForm : Form
     {
         if (_recorder.IsRecording)
         {
-            MessageBox.Show(this, "请先停止录制再导入配置。", "提示");
+            MessageBox.Show(
+                this,
+                AppLocalizer.Get("StopBeforeImport"),
+                AppLocalizer.Get("Information"));
             return;
         }
 
         using var dialog = new OpenFileDialog
         {
-            Title = "导入色彩量化配置",
-            Filter = "色彩量化配置|*.dbconfig.json;*.json|所有文件|*.*",
+            Title = AppLocalizer.Get("ImportConfigurationTitle"),
+            Filter = AppLocalizer.Get("ConfigurationOpenFilter"),
             CheckFileExists = true,
             Multiselect = false,
         };
@@ -1108,14 +1246,14 @@ public sealed class MainForm : Form
             BinarizerConfiguration configuration =
                 ConfigurationFile.Load(dialog.FileName);
             ApplyConfiguration(configuration);
-            _statusLabel.Text = $"配置已导入：{dialog.FileName}";
+            _statusLabel.Text = AppLocalizer.Format("ConfigurationImported", dialog.FileName);
         }
         catch (Exception exception)
         {
             MessageBox.Show(
                 this,
-                $"无法导入配置：{exception.Message}",
-                "配置导入错误",
+                AppLocalizer.Format("CannotImportConfiguration", exception.Message),
+                AppLocalizer.Get("ConfigurationImportError"),
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
         }
@@ -1184,7 +1322,7 @@ public sealed class MainForm : Form
         _customPalette.Clear();
         _customPalette.AddRange(configuration.Palette.Select(ConfigurationFile.ParseColor));
         _palettePreview.Colors = _customPalette.ToArray();
-        _paletteCountLabel.Text = $"{_customPalette.Count} 种颜色";
+        _paletteCountLabel.Text = AppLocalizer.Format("ColorCount", _customPalette.Count);
         RefreshPixelSpacingColors();
         Color importedSpacingColor =
             ConfigurationFile.ParseColor(configuration.PixelSpacingColor);
@@ -1256,7 +1394,7 @@ public sealed class MainForm : Form
             ?.index ?? -1;
         if (index < 0)
         {
-            throw new InvalidDataException($"不支持数值 {value}。");
+            throw new InvalidDataException(AppLocalizer.Format("UnsupportedValue", value));
         }
 
         return index;
@@ -1266,14 +1404,17 @@ public sealed class MainForm : Form
     {
         if (_latestOutputFrame is null)
         {
-            MessageBox.Show(this, "当前还没有可保存的画面。", "提示");
+            MessageBox.Show(
+                this,
+                AppLocalizer.Get("NoFrameToSave"),
+                AppLocalizer.Get("Information"));
             return;
         }
 
         using var dialog = new SaveFileDialog
         {
-            Title = "保存量化图像",
-            Filter = "PNG 图像|*.png|BMP 图像|*.bmp",
+            Title = AppLocalizer.Get("SaveQuantizedImage"),
+            Filter = AppLocalizer.Get("ImageSaveFilter"),
             DefaultExt = "png",
             AddExtension = true,
             FileName = $"quantized-{DateTime.Now:yyyyMMdd-HHmmss}.png",
@@ -1287,7 +1428,7 @@ public sealed class MainForm : Form
         using var copy = new Bitmap(_latestOutputFrame);
         ImageFormat format = dialog.FilterIndex == 2 ? ImageFormat.Bmp : ImageFormat.Png;
         copy.Save(dialog.FileName, format);
-        _statusLabel.Text = $"已保存：{dialog.FileName}";
+        _statusLabel.Text = AppLocalizer.Format("SavedPath", dialog.FileName);
     }
 
     private async void MainFormOnFormClosing(object? sender, FormClosingEventArgs e)
@@ -1319,12 +1460,24 @@ public sealed class MainForm : Form
     {
         return settings.ColorMode switch
         {
-            ColorQuantizationMode.Grayscale => $"{settings.GrayscaleBits} bit 灰度",
-            ColorQuantizationMode.RgbUniform => $"{settings.RgbBits} bit RGB/通道",
+            ColorQuantizationMode.Grayscale =>
+                AppLocalizer.Format(
+                    "ColorDescriptionGrayscale",
+                    settings.GrayscaleBits),
+            ColorQuantizationMode.RgbUniform =>
+                AppLocalizer.Format(
+                    "ColorDescriptionRgbUniform",
+                    settings.RgbBits),
             ColorQuantizationMode.RgbPerChannel =>
-                $"RGB {settings.RedBits}/{settings.GreenBits}/{settings.BlueBits} bit",
+                AppLocalizer.Format(
+                    "ColorDescriptionRgbPerChannel",
+                    settings.RedBits,
+                    settings.GreenBits,
+                    settings.BlueBits),
             ColorQuantizationMode.CustomPalette =>
-                $"{settings.Palette.Count} 色调色板",
+                AppLocalizer.Format(
+                    "ColorDescriptionPalette",
+                    settings.Palette.Count),
             _ => string.Empty,
         };
     }
@@ -1376,7 +1529,48 @@ public sealed class MainForm : Form
         comboBox.Dock = DockStyle.Top;
     }
 
-    private static Control CreateLabeledControl(string labelText, Control control)
+    private static void ConfigureLocalizedComboBox(
+        ComboBox comboBox,
+        string[] keys,
+        int selectedIndex)
+    {
+        comboBox.Tag = new LocalizedItemsTag(keys);
+        ConfigureComboBox(
+            comboBox,
+            keys.Select(AppLocalizer.Get).Cast<object>().ToArray(),
+            selectedIndex);
+    }
+
+    private static void ReplaceLocalizedItems(ComboBox comboBox, string[] keys)
+    {
+        int selectedIndex = comboBox.SelectedIndex;
+        comboBox.BeginUpdate();
+        try
+        {
+            comboBox.Items.Clear();
+            comboBox.Items.AddRange(
+                keys.Select(AppLocalizer.Get).Cast<object>().ToArray());
+            if (comboBox.Items.Count > 0)
+            {
+                comboBox.SelectedIndex = Math.Clamp(
+                    selectedIndex,
+                    0,
+                    comboBox.Items.Count - 1);
+            }
+        }
+        finally
+        {
+            comboBox.EndUpdate();
+        }
+    }
+
+    private static void SetLocalizedText(Control control, string key)
+    {
+        control.Tag = new LocalizedTextTag(key);
+        control.Text = AppLocalizer.Get(key);
+    }
+
+    private static Control CreateLabeledControl(string labelKey, Control control)
     {
         var layout = new TableLayoutPanel
         {
@@ -1387,7 +1581,8 @@ public sealed class MainForm : Form
         };
         layout.Controls.Add(new Label
         {
-            Text = labelText,
+            Text = AppLocalizer.Get(labelKey),
+            Tag = new LocalizedTextTag(labelKey),
             AutoSize = true,
             ForeColor = Color.DimGray,
             Margin = new Padding(0, 0, 0, 3),
@@ -1398,7 +1593,7 @@ public sealed class MainForm : Form
 
     private static TableLayoutPanel ConfigurePreviewContainer(
         TableLayoutPanel container,
-        string title,
+        string titleKey,
         PixelPreview preview)
     {
         container.Dock = DockStyle.Fill;
@@ -1411,7 +1606,8 @@ public sealed class MainForm : Form
 
         var label = new Label
         {
-            Text = title,
+            Text = AppLocalizer.Get(titleKey),
+            Tag = new LocalizedTextTag(titleKey),
             AutoSize = true,
             Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold),
             Margin = new Padding(8, 7, 8, 7),
@@ -1436,11 +1632,12 @@ public sealed class MainForm : Form
         return layout;
     }
 
-    private static Label CreateSectionLabel(string text)
+    private static Label CreateSectionLabel(string key)
     {
         return new Label
         {
-            Text = text,
+            Text = AppLocalizer.Get(key),
+            Tag = new LocalizedTextTag(key),
             AutoSize = true,
             Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold),
             Margin = new Padding(0, 0, 0, 6),
@@ -1469,9 +1666,9 @@ public sealed class MainForm : Form
 
     private static void ConfigureSingleOptionPanel(
         TableLayoutPanel panel,
-        string labelText,
+        string labelKey,
         Control input,
-        string hint)
+        string hintKey)
     {
         panel.Dock = DockStyle.Top;
         panel.AutoSize = true;
@@ -1482,7 +1679,8 @@ public sealed class MainForm : Form
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         panel.Controls.Add(new Label
         {
-            Text = labelText,
+            Text = AppLocalizer.Get(labelKey),
+            Tag = new LocalizedTextTag(labelKey),
             AutoSize = true,
             Anchor = AnchorStyles.Left,
             Margin = new Padding(0, 6, 8, 0),
@@ -1490,7 +1688,8 @@ public sealed class MainForm : Form
         panel.Controls.Add(input, 1, 0);
         panel.Controls.Add(new Label
         {
-            Text = hint,
+            Text = AppLocalizer.Get(hintKey),
+            Tag = new LocalizedTextTag(hintKey),
             AutoSize = true,
             Anchor = AnchorStyles.Left,
             ForeColor = Color.DimGray,
@@ -1507,6 +1706,10 @@ public sealed class MainForm : Form
             Margin = new Padding(0),
         };
     }
+
+    private sealed record LocalizedTextTag(string Key);
+
+    private sealed record LocalizedItemsTag(string[] Keys);
 
     private sealed record CaptureSettings(
         OutputSizeMode OutputSizeMode,
@@ -1527,4 +1730,5 @@ public sealed class MainForm : Form
         int PixelSpacingWidth,
         Color PixelSpacingColor,
         bool ShowOriginalPreview);
+
 }

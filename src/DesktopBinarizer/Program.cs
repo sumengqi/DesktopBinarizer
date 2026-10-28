@@ -6,6 +6,7 @@ internal static class Program
     private static void Main()
     {
         ApplicationConfiguration.Initialize();
+        AppLocalizer.Language = AppPreferencesFile.LoadOrDefault().Language;
         Application.Run(new MainForm());
     }
 }

@@ -101,7 +101,7 @@ public static class ConfigurationFile
         ArgumentException.ThrowIfNullOrWhiteSpace(json);
         BinarizerConfiguration configuration =
             JsonSerializer.Deserialize<BinarizerConfiguration>(json, JsonOptions)
-            ?? throw new InvalidDataException("配置文件内容为空。");
+            ?? throw new InvalidDataException(AppLocalizer.Get("ConfigurationEmpty"));
         Validate(configuration);
         return configuration;
     }
@@ -122,7 +122,8 @@ public static class ConfigurationFile
                 provider: null,
                 out int rgb))
         {
-            throw new InvalidDataException($"颜色“{value}”不是有效的 #RRGGBB 格式。");
+            throw new InvalidDataException(
+                AppLocalizer.Format("InvalidHexColor", value ?? string.Empty));
         }
 
         return Color.FromArgb(
@@ -137,9 +138,10 @@ public static class ConfigurationFile
 
         if (configuration.Version != BinarizerConfiguration.CurrentVersion)
         {
-            throw new InvalidDataException(
-                $"不支持配置版本 {configuration.Version}，当前版本为 " +
-                $"{BinarizerConfiguration.CurrentVersion}。");
+            throw new InvalidDataException(AppLocalizer.Format(
+                "UnsupportedConfigurationVersion",
+                configuration.Version,
+                BinarizerConfiguration.CurrentVersion));
         }
 
         ValidateEnum(configuration.CaptureSource, nameof(configuration.CaptureSource));
@@ -147,41 +149,49 @@ public static class ConfigurationFile
         ValidateEnum(configuration.OutputSizeMode, nameof(configuration.OutputSizeMode));
         ValidateEnum(configuration.ColorMode, nameof(configuration.ColorMode));
         ValidateEnum(configuration.DitherAlgorithm, nameof(configuration.DitherAlgorithm));
-        ValidateRange(configuration.OutputWidth, 16, 8192, "输出宽度");
-        ValidateRange(configuration.OutputHeight, 16, 8192, "输出高度");
+        ValidateRange(
+            configuration.OutputWidth,
+            16,
+            8192,
+            AppLocalizer.Get("OutputWidth"));
+        ValidateRange(
+            configuration.OutputHeight,
+            16,
+            8192,
+            AppLocalizer.Get("OutputHeight"));
         ValidateSupported(
             configuration.OutputMultiplier,
             SupportedMultipliers,
-            "输出倍数");
+            AppLocalizer.Get("OutputMultiplierName"));
         ValidateSupported(
             configuration.PreviewScale,
             SupportedPreviewScales,
-            "预览缩放");
-        ValidateRange(configuration.GrayscaleBits, 1, 8, "灰度位深");
-        ValidateRange(configuration.RgbBits, 1, 8, "RGB 位深");
-        ValidateRange(configuration.RedBits, 1, 8, "红色位深");
-        ValidateRange(configuration.GreenBits, 1, 8, "绿色位深");
-        ValidateRange(configuration.BlueBits, 1, 8, "蓝色位深");
-        ValidateRange(configuration.Threshold, 0, 255, "二值化阈值");
-        ValidateRange(configuration.PixelSpacingWidth, 1, 32, "像素间距宽度");
+            AppLocalizer.Get("PreviewScaleName"));
+        ValidateRange(configuration.GrayscaleBits, 1, 8, AppLocalizer.Get("GrayscaleDepthName"));
+        ValidateRange(configuration.RgbBits, 1, 8, AppLocalizer.Get("RgbDepthName"));
+        ValidateRange(configuration.RedBits, 1, 8, AppLocalizer.Get("RedDepthName"));
+        ValidateRange(configuration.GreenBits, 1, 8, AppLocalizer.Get("GreenDepthName"));
+        ValidateRange(configuration.BlueBits, 1, 8, AppLocalizer.Get("BlueDepthName"));
+        ValidateRange(configuration.Threshold, 0, 255, AppLocalizer.Get("ThresholdName"));
+        ValidateRange(configuration.PixelSpacingWidth, 1, 32, AppLocalizer.Get("PixelSpacingWidthName"));
 
         if (!SupportedFrameRates.Contains(configuration.FrameRate))
         {
             throw new InvalidDataException(
-                $"帧率 {configuration.FrameRate} 不在支持列表中。");
+                AppLocalizer.Format("UnsupportedFrameRate", configuration.FrameRate));
         }
 
         if (configuration.Palette is null ||
             configuration.Palette.Length is < 2 or > 256)
         {
-            throw new InvalidDataException("调色板必须包含 2–256 种颜色。");
+            throw new InvalidDataException(AppLocalizer.Get("PaletteRange"));
         }
 
         Color[] palette = configuration.Palette.Select(ParseColor).ToArray();
         Color spacingColor = ParseColor(configuration.PixelSpacingColor);
         if (!palette.Any(color => color.ToArgb() == spacingColor.ToArgb()))
         {
-            throw new InvalidDataException("像素间距颜色必须存在于自定义调色板中。");
+            throw new InvalidDataException(AppLocalizer.Get("SpacingColorInPalette"));
         }
     }
 
@@ -201,7 +211,7 @@ public static class ConfigurationFile
     {
         if (!Enum.IsDefined(value))
         {
-            throw new InvalidDataException($"{name} 包含不支持的值。");
+            throw new InvalidDataException(AppLocalizer.Format("UnsupportedEnum", name));
         }
     }
 
@@ -210,7 +220,7 @@ public static class ConfigurationFile
         if (value < minimum || value > maximum)
         {
             throw new InvalidDataException(
-                $"{name}必须在 {minimum}–{maximum} 范围内。");
+                AppLocalizer.Format("RangeError", name, minimum, maximum));
         }
     }
 
@@ -221,7 +231,8 @@ public static class ConfigurationFile
     {
         if (!supportedValues.Any(item => Math.Abs(item - value) < 0.000001))
         {
-            throw new InvalidDataException($"{name} {value} 不受支持。");
+            throw new InvalidDataException(
+                AppLocalizer.Format("UnsupportedSetting", name, value));
         }
     }
 }

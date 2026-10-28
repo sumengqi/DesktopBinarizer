@@ -4,6 +4,11 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### Added
+
+- Added a Language menu with complete Simplified Chinese and English interfaces.
+- Persisted the selected interface language across application restarts.
+
 ### Changed
 
 - Optimized non-dithered RGB quantization with precomputed channel lookup tables.
@@ -14,7 +19,8 @@ All notable changes to this project are documented in this file.
 
 ### Tests
 
-- Added exact RGB fast-path, fractional pixel-grid scaling, and disposal lifecycle coverage.
+- Added exact RGB fast-path, fractional pixel-grid scaling, disposal lifecycle,
+  language switching, and preference persistence coverage.
 
 ## 1.0.0 - 2026-10-22
 

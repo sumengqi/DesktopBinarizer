@@ -100,7 +100,7 @@ public sealed class PixelPreview : ScrollableControl
         if (_image is null)
         {
             using var brush = new SolidBrush(Color.Gainsboro);
-            const string text = "等待画面...";
+            string text = AppLocalizer.Get("WaitingForFrame");
             SizeF textSize = e.Graphics.MeasureString(text, Font);
             e.Graphics.DrawString(
                 text,
@@ -276,7 +276,8 @@ public sealed class PixelPreview : ScrollableControl
 
         if (image is not Bitmap bitmap)
         {
-            throw new InvalidOperationException("像素网格预览需要位图图像。");
+            throw new InvalidOperationException(
+                AppLocalizer.Get("PixelGridRequiresBitmap"));
         }
 
         return PixelGridRenderer.Render(

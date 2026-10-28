@@ -9,7 +9,7 @@ public sealed class PaletteEditorForm : Form
     {
         _colors = colors.ToList();
 
-        Text = "自定义调色板";
+        Text = AppLocalizer.Get("PaletteEditorTitle");
         StartPosition = FormStartPosition.CenterParent;
         MinimumSize = new Size(520, 420);
         ClientSize = new Size(620, 500);
@@ -38,7 +38,7 @@ public sealed class PaletteEditorForm : Form
 
         var description = new Label
         {
-            Text = "添加 2–256 种颜色，可从颜色对话框或屏幕像素取色。",
+            Text = AppLocalizer.Get("PaletteEditorDescription"),
             AutoSize = true,
             ForeColor = Color.DimGray,
             Margin = new Padding(0, 0, 0, 10),
@@ -60,15 +60,15 @@ public sealed class PaletteEditorForm : Form
             WrapContents = false,
             Padding = new Padding(10, 0, 0, 0),
         };
-        actions.Controls.Add(CreateButton("添加颜色", AddColor));
-        actions.Controls.Add(CreateButton("屏幕取色", PickColorFromScreen));
-        actions.Controls.Add(CreateButton("编辑颜色", EditSelectedColor));
-        actions.Controls.Add(CreateButton("删除颜色", DeleteSelectedColor));
-        actions.Controls.Add(CreateButton("上移", () => MoveSelectedColor(-1)));
-        actions.Controls.Add(CreateButton("下移", () => MoveSelectedColor(1)));
+        actions.Controls.Add(CreateButton(AppLocalizer.Get("AddColor"), AddColor));
+        actions.Controls.Add(CreateButton(AppLocalizer.Get("PickScreenColor"), PickColorFromScreen));
+        actions.Controls.Add(CreateButton(AppLocalizer.Get("EditColor"), EditSelectedColor));
+        actions.Controls.Add(CreateButton(AppLocalizer.Get("DeleteColor"), DeleteSelectedColor));
+        actions.Controls.Add(CreateButton(AppLocalizer.Get("MoveUp"), () => MoveSelectedColor(-1)));
+        actions.Controls.Add(CreateButton(AppLocalizer.Get("MoveDown"), () => MoveSelectedColor(1)));
         actions.Controls.Add(CreateSpacer(10));
-        actions.Controls.Add(CreateButton("黑白", () => SetPreset([Color.Black, Color.White])));
-        actions.Controls.Add(CreateButton("RGB 8色", () => SetPreset(
+        actions.Controls.Add(CreateButton(AppLocalizer.Get("BlackAndWhite"), () => SetPreset([Color.Black, Color.White])));
+        actions.Controls.Add(CreateButton(AppLocalizer.Get("RgbEightColors"), () => SetPreset(
         [
             Color.Black,
             Color.Red,
@@ -98,13 +98,13 @@ public sealed class PaletteEditorForm : Form
         };
         var okButton = new Button
         {
-            Text = "确定",
+            Text = AppLocalizer.Get("Ok"),
             AutoSize = true,
         };
         okButton.Click += (_, _) => AcceptPalette();
         var cancelButton = new Button
         {
-            Text = "取消",
+            Text = AppLocalizer.Get("Cancel"),
             AutoSize = true,
             DialogResult = DialogResult.Cancel,
         };
@@ -122,7 +122,10 @@ public sealed class PaletteEditorForm : Form
     {
         if (_colors.Count >= 256)
         {
-            MessageBox.Show(this, "调色板最多支持 256 种颜色。", "提示");
+            MessageBox.Show(
+                this,
+                AppLocalizer.Get("PaletteMaximum"),
+                AppLocalizer.Get("Information"));
             return;
         }
 
@@ -166,7 +169,10 @@ public sealed class PaletteEditorForm : Form
     {
         if (_colors.Count >= 256)
         {
-            MessageBox.Show(this, "调色板最多支持 256 种颜色。", "提示");
+            MessageBox.Show(
+                this,
+                AppLocalizer.Get("PaletteMaximum"),
+                AppLocalizer.Get("Information"));
             return;
         }
 
@@ -218,8 +224,8 @@ public sealed class PaletteEditorForm : Form
         {
             MessageBox.Show(
                 this,
-                "自定义调色板至少需要两种颜色。",
-                "调色板无效",
+                AppLocalizer.Get("PaletteMinimum"),
+                AppLocalizer.Get("InvalidPalette"),
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Warning);
             return;

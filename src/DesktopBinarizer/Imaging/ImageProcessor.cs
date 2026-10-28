@@ -121,14 +121,14 @@ public static class ImageProcessor
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
-                "输出宽高必须在 1 到 8192 之间。");
+                AppLocalizer.Get("OutputDimensionRange"));
         }
 
         if (options.Threshold is < 0 or > 255)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
-                "阈值必须在 0 到 255 之间。");
+                AppLocalizer.Get("ThresholdRange"));
         }
 
         ValidateBitDepth(options.GrayscaleBits, nameof(options.GrayscaleBits));
@@ -141,21 +141,21 @@ public static class ImageProcessor
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
-                "不支持所选的颜色量化模式。");
+                AppLocalizer.Get("UnsupportedColorMode"));
         }
 
         if (options.ColorMode == ColorQuantizationMode.CustomPalette &&
             (options.Palette is null || options.Palette.Count < 2))
         {
             throw new ArgumentException(
-                "自定义调色板至少需要两种颜色。",
+                AppLocalizer.Get("PaletteMinimum"),
                 nameof(options));
         }
 
         if (options.Palette is { Count: > 256 })
         {
             throw new ArgumentException(
-                "自定义调色板最多支持 256 种颜色。",
+                AppLocalizer.Get("PaletteMaximumArgument"),
                 nameof(options));
         }
 
@@ -163,14 +163,14 @@ public static class ImageProcessor
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
-                "不支持所选的扩散算法。");
+                AppLocalizer.Get("UnsupportedDither"));
         }
 
         if (!Enum.IsDefined(options.InputScaleMode))
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
-                "不支持所选的输入缩放方式。");
+                AppLocalizer.Get("UnsupportedInputScaling"));
         }
 
         if (options.EnablePixelSpacing)
@@ -179,7 +179,7 @@ public static class ImageProcessor
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(options),
-                    "像素间距宽度必须在 1 到 32 之间。");
+                    AppLocalizer.Get("PixelSpacingRange"));
             }
 
             int finalWidth = GetSpacedDimension(
@@ -192,7 +192,10 @@ public static class ImageProcessor
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(options),
-                    $"插入间距后的尺寸 {finalWidth} × {finalHeight} 超过 8192 × 8192。");
+                    AppLocalizer.Format(
+                        "SpacedDimensionsTooLarge",
+                        finalWidth,
+                        finalHeight));
             }
         }
     }
@@ -203,7 +206,7 @@ public static class ImageProcessor
         {
             throw new ArgumentOutOfRangeException(
                 parameterName,
-                "颜色位深必须在 1 到 8 bit 之间。");
+                AppLocalizer.Get("ColorDepthRange"));
         }
     }
 
@@ -263,7 +266,7 @@ public static class ImageProcessor
         {
             throw new ArgumentOutOfRangeException(
                 nameof(spacingWidth),
-                "像素间距宽度必须在 1 到 32 之间。");
+                AppLocalizer.Get("PixelSpacingRange"));
         }
 
         int outputWidth = GetSpacedDimension(source.Width, spacingWidth);
@@ -272,7 +275,10 @@ public static class ImageProcessor
         {
             throw new ArgumentOutOfRangeException(
                 nameof(source),
-                $"插入间距后的尺寸 {outputWidth} × {outputHeight} 超过 8192 × 8192。");
+                AppLocalizer.Format(
+                    "SpacedDimensionsTooLarge",
+                    outputWidth,
+                    outputHeight));
         }
 
         var output = new Bitmap(

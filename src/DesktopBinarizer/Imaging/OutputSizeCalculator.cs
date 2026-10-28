@@ -34,7 +34,11 @@ public static class OutputSizeCalculator
             result.Height is < 1 or > MaximumDimension)
         {
             throw new InvalidOperationException(
-                $"计算出的输出尺寸 {result.Width} × {result.Height} 超出 1–{MaximumDimension} 范围。");
+                AppLocalizer.Format(
+                    "CalculatedOutputOutOfRange",
+                    result.Width,
+                    result.Height,
+                    MaximumDimension));
         }
 
         return result;

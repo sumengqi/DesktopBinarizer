@@ -42,6 +42,8 @@ Run("像素间距预览严格点对点且没有外框", TestPixelPreviewRenderin
 Run("预览快速换帧不会出现背景空白", TestRapidPreviewFrameSwaps);
 Run("单帧合成异常会被抑制", TestTransientFrameSuppression);
 Run("瞬态帧过滤器释放后拒绝调用", TestTransientFrameFilterDisposal);
+Run("语言菜单可以在中文和英文之间切换", TestLanguageMenu);
+Run("语言偏好可以持久化", TestLanguagePreferences);
 Run("配置可以完整导出和导入", TestConfigurationRoundTrip);
 Run("所有误差扩散算法支持彩色调色板", TestAllDitherAlgorithms);
 Run("反相会交换黑白", TestInvert);
@@ -759,6 +761,94 @@ static void TestTransientFrameFilterDisposal()
     });
 }
 
+static void TestLanguageMenu()
+{
+    Exception? failure = null;
+    var thread = new Thread(() =>
+    {
+        AppLanguage originalLanguage = AppLocalizer.Language;
+        try
+        {
+            AppLocalizer.Language = AppLanguage.ChineseSimplified;
+            AppLanguage? savedLanguage = null;
+            using var form = new MainForm(language => savedLanguage = language);
+            ToolStripMenuItem languageMenu =
+                (ToolStripMenuItem)form.MainMenuStrip!.Items[0];
+            ToolStripMenuItem englishItem =
+                (ToolStripMenuItem)languageMenu.DropDownItems[1];
+
+            Assert(languageMenu.Text == "语言", "中文语言菜单未显示");
+            englishItem.PerformClick();
+
+            Assert(form.Text == "Desktop Color Quantizer", "英文窗口标题未生效");
+            Assert(languageMenu.Text == "Language", "英文语言菜单未生效");
+            Assert(englishItem.Checked, "英文菜单项未选中");
+            Assert(savedLanguage == AppLanguage.English, "英文语言偏好未保存");
+            Assert(
+                EnumerateControls(form).Any(control => control.Text == "Import Settings"),
+                "英文界面控件未刷新");
+
+            ToolStripMenuItem chineseItem =
+                (ToolStripMenuItem)languageMenu.DropDownItems[0];
+            chineseItem.PerformClick();
+            Assert(form.Text == "桌面色彩量化实时预览", "中文窗口标题未恢复");
+            Assert(chineseItem.Checked, "中文菜单项未选中");
+        }
+        catch (Exception exception)
+        {
+            failure = exception;
+        }
+        finally
+        {
+            AppLocalizer.Language = originalLanguage;
+        }
+    });
+    thread.SetApartmentState(ApartmentState.STA);
+    thread.Start();
+
+    if (!thread.Join(TimeSpan.FromSeconds(10)))
+    {
+        throw new TimeoutException("语言菜单测试超时。");
+    }
+
+    if (failure is not null)
+    {
+        System.Runtime.ExceptionServices.ExceptionDispatchInfo
+            .Capture(failure)
+            .Throw();
+    }
+}
+
+static void TestLanguagePreferences()
+{
+    string path = Path.Combine(
+        Path.GetTempPath(),
+        $"desktop-binarizer-preferences-{Guid.NewGuid():N}.json");
+    try
+    {
+        var expected = new AppPreferences { Language = AppLanguage.English };
+        AppPreferencesFile.Save(expected, path);
+        AppPreferences actual = AppPreferencesFile.LoadOrDefault(path);
+        Assert(actual.Language == AppLanguage.English, "英文语言偏好未恢复");
+
+        File.WriteAllText(path, "not-json");
+        AppPreferences fallback = AppPreferencesFile.LoadOrDefault(path);
+        Assert(
+            fallback.Language == AppLanguage.ChineseSimplified,
+            "损坏的偏好文件没有安全回退到中文");
+
+        File.WriteAllText(path, string.Empty);
+        AppPreferences emptyFallback = AppPreferencesFile.LoadOrDefault(path);
+        Assert(
+            emptyFallback.Language == AppLanguage.ChineseSimplified,
+            "空偏好文件没有安全回退到中文");
+    }
+    finally
+    {
+        File.Delete(path);
+    }
+}
+
 static void TestConfigurationRoundTrip()
 {
     var expected = new BinarizerConfiguration
@@ -1084,6 +1174,18 @@ static void ForEachPixel(Bitmap bitmap, Action<Color> assertion)
         for (int x = 0; x < bitmap.Width; x++)
         {
             assertion(bitmap.GetPixel(x, y));
+        }
+    }
+}
+
+static IEnumerable<Control> EnumerateControls(Control root)
+{
+    yield return root;
+    foreach (Control child in root.Controls)
+    {
+        foreach (Control descendant in EnumerateControls(child))
+        {
+            yield return descendant;
         }
     }
 }
